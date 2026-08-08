@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Configuration — Bar Bot</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #0b3d91;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px;
+  }
+  .box {
+    background: #0d47a1;
+    border-radius: 14px;
+    padding: 28px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  p.sub { opacity: 0.75; font-size: 13px; margin-bottom: 20px; }
+  label { display: block; font-size: 13px; margin: 14px 0 6px; opacity: 0.9; }
+  input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: none;
+    font-size: 14px;
+  }
+  button {
+    margin-top: 22px;
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: #ff3b30;
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.6; cursor: default; }
+  #msg { margin-top: 14px; font-size: 13px; text-align: center; }
+  .ok { color: #7CFC00; }
+  .err { color: #ffb3b3; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <h1>Configuration du bot</h1>
+    <p class="sub">Renseignez le token de votre bot Telegram, votre ID administrateur et l'ID du canal privé.</p>
+
+    <label for="token">Token API du bot</label>
+    <input id="token" type="text" placeholder="123456789:AAExxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+
+    <label for="admin">ID Telegram de l'administrateur</label>
+    <input id="admin" type="text" placeholder="ex: 987654321">
+
+    <label for="channel">ID du canal privé</label>
+    <input id="channel" type="text" placeholder="ex: -1001234567890">
+
+    <button id="save">Enregistrer et démarrer le bot</button>
+    <div id="msg"></div>
+  </div>
+
+<script>
+  const btn = document.getElementById('save');
+  const msg = document.getElementById('msg');
+
+  btn.addEventListener('click', async () => {
+    const BOT_TOKEN = document.getElementById('token').value.trim();
+    const ADMIN_ID = document.getElementById('admin').value.trim();
+    const CHANNEL_ID = document.getElementById('channel').value.trim();
+
+    if (!BOT_TOKEN || !ADMIN_ID || !CHANNEL_ID) {
+      msg.textContent = 'Merci de remplir les trois champs.';
+      msg.className = 'err';
+      return;
+    }
+
+    btn.disabled = true;
+    msg.textContent = 'Enregistrement…';
+    msg.className = '';
+
+    try {
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ BOT_TOKEN, ADMIN_ID, CHANNEL_ID })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        msg.textContent = "Configuration enregistrée. Le bot est démarré — ajoutez-le à votre canal.";
+        msg.className = 'ok';
+      } else {
+        msg.textContent = data.error || 'Erreur lors de l\'enregistrement.';
+        msg.className = 'err';
+      }
+    } catch (e) {
+      msg.textContent = 'Erreur de connexion au serveur.';
+      msg.className = 'err';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

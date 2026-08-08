@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Bar Bot</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #0b3d91;
+    overflow: hidden;
+  }
+  #panel {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    color: #ffffff;
+  }
+  #header {
+    width: 100%;
+    background: #0d47a1;
+    padding: 18px 10px;
+    text-align: center;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+  }
+  #header .brand {
+    font-size: 15px;
+    letter-spacing: 2px;
+    opacity: 0.8;
+    text-transform: uppercase;
+  }
+  #greeting {
+    font-size: 13px;
+    margin-top: 6px;
+    opacity: 0.9;
+    min-height: 16px;
+  }
+  #clock {
+    color: #ff3b30;
+    font-size: 28px;
+    font-weight: 700;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  #middle {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 20px;
+    text-align: center;
+  }
+  .idle-suits {
+    display: flex;
+    gap: 22px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .idle-suit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .idle-suit .glyph { font-size: 40px; }
+  .idle-suit .name { font-size: 12px; opacity: 0.8; }
+
+  #lockOverlay {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+  #lockOverlay .spinner {
+    width: 34px; height: 34px;
+    border: 3px solid rgba(255,255,255,0.3);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #lockOverlay p { font-size: 15px; opacity: 0.9; max-width: 260px; }
+
+  #card {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    animation: pop 0.25s ease;
+  }
+  @keyframes pop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  #card .suitGlyph { font-size: 96px; line-height: 1; }
+  #card .number { font-size: 64px; font-weight: 800; }
+  #card .suitName { font-size: 16px; opacity: 0.85; }
+
+  #channelMsg {
+    display: none;
+    max-width: 300px;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.4;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 12px;
+    padding: 18px 20px;
+    animation: pop 0.25s ease;
+  }
+
+  #waiting {
+    font-size: 15px;
+    opacity: 0.75;
+  }
+
+  #footer {
+    width: 100%;
+    text-align: center;
+    padding: 16px;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    background: #0d47a1;
+    box-shadow: 0 -3px 10px rgba(0,0,0,0.25);
+  }
+</style>
+</head>
+<body>
+<div id="panel">
+  <div id="header">
+    <div class="brand">Bar Bot</div>
+    <div id="greeting"></div>
+    <div id="clock">--:--:--</div>
+  </div>
+
+  <div id="middle">
+    <!-- Écran d'attente de validation -->
+    <div id="lockOverlay">
+      <div class="spinner"></div>
+      <p id="lockText">Envoi de votre demande à l'administrateur…</p>
+    </div>
+
+    <!-- Vue par défaut (juste après approbation, avant le prochain tirage) -->
+    <div class="idle-suits" id="idleSuits" style="display:none;">
+      <div class="idle-suit"><span class="glyph">♠️</span><span class="name">Pique</span></div>
+      <div class="idle-suit"><span class="glyph">♦️</span><span class="name">Carreau</span></div>
+      <div class="idle-suit"><span class="glyph">♣️</span><span class="name">Trèfle</span></div>
+      <div class="idle-suit"><span class="glyph">❤️</span><span class="name">Cœur</span></div>
+    </div>
+    <div id="waiting" style="display:none;">Prochain tirage à venir…</div>
+
+    <!-- Carte du tirage en cours -->
+    <div id="card">
+      <div class="suitGlyph" id="cardGlyph">♠️</div>
+      <div class="number" id="cardNumber">0</div>
+      <div class="suitName" id="cardSuitName">Pique</div>
+    </div>
+
+    <!-- Message du canal (remplace temporairement la carte) -->
+    <div id="channelMsg"></div>
+  </div>
+
+  <div id="footer">BAR BOT</div>
+</div>
+
+<script>
+  const tg = window.Telegram ? window.Telegram.WebApp : null;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  const user = tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user : null;
+  const userId = user ? user.id : null;
+
+  const lockOverlay = document.getElementById('lockOverlay');
+  const lockText = document.getElementById('lockText');
+  const idleSuits = document.getElementById('idleSuits');
+  const waiting = document.getElementById('waiting');
+  const cardEl = document.getElementById('card');
+  const cardGlyph = document.getElementById('cardGlyph');
+  const cardNumber = document.getElementById('cardNumber');
+  const cardSuitName = document.getElementById('cardSuitName');
+  const channelMsgEl = document.getElementById('channelMsg');
+
+  // Horloge (heure de la Côte d'Ivoire — Abidjan)
+  function tickClock() {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('fr-FR', {
+      timeZone: 'Africa/Abidjan',
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false
+    }).formatToParts(now);
+    const get = (t) => parts.find(p => p.type === t).value;
+    document.getElementById('clock').textContent =
+      `${get('day')}/${get('month')}/${get('year')} — ${get('hour')}:${get('minute')}:${get('second')}`;
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  function showLocked(text) {
+    lockOverlay.style.display = 'flex';
+    idleSuits.style.display = 'none';
+    waiting.style.display = 'none';
+    cardEl.style.display = 'none';
+    channelMsgEl.style.display = 'none';
+    if (text) lockText.textContent = text;
+  }
+
+  function showIdle() {
+    lockOverlay.style.display = 'none';
+    idleSuits.style.display = 'flex';
+    waiting.style.display = 'none';
+    cardEl.style.display = 'none';
+    channelMsgEl.style.display = 'none';
+  }
+
+  function showWaitingOnly() {
+    lockOverlay.style.display = 'none';
+    idleSuits.style.display = 'none';
+    waiting.style.display = 'block';
+    cardEl.style.display = 'none';
+    channelMsgEl.style.display = 'none';
+  }
+
+  function showCard(data) {
+    lockOverlay.style.display = 'none';
+    idleSuits.style.display = 'none';
+    waiting.style.display = 'none';
+    channelMsgEl.style.display = 'none';
+    cardGlyph.textContent = data.suit;
+    cardNumber.textContent = data.number;
+    cardSuitName.textContent = data.suitName;
+    cardEl.style.display = 'flex';
+  }
+
+  function showChannelMessage(text) {
+    lockOverlay.style.display = 'none';
+    idleSuits.style.display = 'none';
+    waiting.style.display = 'none';
+    cardEl.style.display = 'none';
+    channelMsgEl.textContent = text;
+    channelMsgEl.style.display = 'block';
+  }
+
+  let isApproved = false;
+
+  async function loadGreeting() {
+    if (!userId) return;
+    try {
+      const res = await fetch('/api/greeting/' + userId);
+      const data = await res.json();
+      document.getElementById('greeting').textContent = data.message;
+    } catch (e) { /* silencieux */ }
+  }
+
+  async function requestAccess() {
+    if (!userId) {
+      showLocked("Impossible de récupérer votre identifiant Telegram. Ouvrez ce panneau depuis Telegram.");
+      return;
+    }
+    try {
+      const res = await fetch('/api/request-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, username: user.username, firstName: user.first_name })
+      });
+      const data = await res.json();
+      if (data.status === 'approved') {
+        isApproved = true;
+        showIdle();
+      } else {
+        showLocked("En attente de validation de l'administrateur…");
+      }
+    } catch (e) {
+      showLocked("Erreur de connexion au serveur. Nouvelle tentative…");
+    }
+  }
+
+  async function pollStatus() {
+    if (isApproved || !userId) return;
+    try {
+      const res = await fetch('/api/status/' + userId);
+      const data = await res.json();
+      if (data.approved) {
+        isApproved = true;
+        showIdle();
+      }
+    } catch (e) { /* silencieux, on réessaie */ }
+  }
+
+  async function pollCurrent() {
+    if (!isApproved) return;
+    try {
+      const res = await fetch('/api/current');
+      const data = await res.json();
+      if (data.channelMessage) {
+        showChannelMessage(data.channelMessage);
+      } else if (data.active) {
+        showCard(data);
+      } else {
+        showWaitingOnly();
+      }
+    } catch (e) { /* silencieux */ }
+  }
+
+  loadGreeting();
+  requestAccess();
+  setInterval(pollStatus, 3000);
+  setInterval(pollCurrent, 1000);
+</script>
+</body>
+</html>

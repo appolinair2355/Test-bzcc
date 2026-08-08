@@ -1,0 +1,16 @@
+{
+  "name": "bar-bot-benin-cards",
+  "version": "1.0.0",
+  "description": "Bot Telegram + Mini App - jeu de cartes basé sur l'heure du Bénin",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}
