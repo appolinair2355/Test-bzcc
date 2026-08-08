@@ -46,7 +46,7 @@ function startBot() {
     bot = null;
   }
   if (!config.BOT_TOKEN) {
-    console.log('BOT_TOKEN manquant — bot non démarré (configurer via /setup.html).');
+    console.log('BOT_TOKEN manquant — bot non démarré (configurer via / (page d'accueil)).');
     return;
   }
 
