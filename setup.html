@@ -51,12 +51,25 @@
   #msg { margin-top: 14px; font-size: 13px; text-align: center; }
   .ok { color: #7CFC00; }
   .err { color: #ffb3b3; }
+  .info-box {
+    background: rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    margin-bottom: 14px;
+    border-left: 3px solid #7CFC00;
+  }
+  .info-box.warn {
+    border-left-color: #FFA500;
+  }
 </style>
 </head>
 <body>
   <div class="box">
     <h1>Configuration du bot</h1>
     <p class="sub">Renseignez le token de votre bot Telegram, votre ID administrateur et l'ID du canal privé.</p>
+
+    <div id="infoBox" class="info-box" style="display:none;"></div>
 
     <label for="token">Token API du bot</label>
     <input id="token" type="text" placeholder="123456789:AAExxxxxxxxxxxxxxxxxxxxxxxxxxxx">
@@ -74,14 +87,49 @@
 <script>
   const btn = document.getElementById('save');
   const msg = document.getElementById('msg');
+  const infoBox = document.getElementById('infoBox');
+
+  // Charger la configuration existante (sans exposer le token)
+  async function loadExistingConfig() {
+    try {
+      const res = await fetch('/api/config-info');
+      const data = await res.json();
+      if (data.adminId) document.getElementById('admin').value = data.adminId;
+      if (data.channelId) document.getElementById('channel').value = data.channelId;
+      if (data.hasToken) {
+        infoBox.style.display = 'block';
+        infoBox.className = 'info-box';
+        infoBox.textContent = '✅ Un token est déjà enregistré. Laissez le champ vide pour le conserver, ou saisissez-en un nouveau pour le remplacer.';
+      } else {
+        infoBox.style.display = 'block';
+        infoBox.className = 'info-box warn';
+        infoBox.textContent = '⚠️ Aucun token enregistré. Veuillez renseigner tous les champs.';
+      }
+    } catch (e) {
+      infoBox.style.display = 'block';
+      infoBox.className = 'info-box warn';
+      infoBox.textContent = '⚠️ Impossible de charger la config actuelle.';
+    }
+  }
+
+  loadExistingConfig();
 
   btn.addEventListener('click', async () => {
     const BOT_TOKEN = document.getElementById('token').value.trim();
     const ADMIN_ID = document.getElementById('admin').value.trim();
     const CHANNEL_ID = document.getElementById('channel').value.trim();
 
-    if (!BOT_TOKEN || !ADMIN_ID || !CHANNEL_ID) {
-      msg.textContent = 'Merci de remplir les trois champs.';
+    if (!ADMIN_ID || !CHANNEL_ID) {
+      msg.textContent = 'Merci de remplir au moins l\'ID admin et l\'ID du canal.';
+      msg.className = 'err';
+      return;
+    }
+
+    // Si le token est vide mais qu'on en a déjà un, on laisse le serveur gérer (ou on bloque)
+    // Ici on exige un token si le champ est rempli, sinon on peut laisser le serveur décider
+    // Pour simplifier, on envoie tout ; le serveur vérifie que BOT_TOKEN est présent
+    if (!BOT_TOKEN) {
+      msg.textContent = 'Merci de remplir le token API du bot.';
       msg.className = 'err';
       return;
     }

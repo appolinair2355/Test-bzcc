@@ -28,9 +28,9 @@ let welcomedChannels = new Set(); // évite de souhaiter "bienvenue" plusieurs f
 // Membres approuvés par l'admin (en mémoire ; se réinitialise si le service redémarre)
 const approved = new Set();
 
-// Dernier message du canal, à afficher dans l'interface du jeu (en mémoire)
-let lastChannelMessage = null; // { text, timestamp }
-const CHANNEL_MESSAGE_DISPLAY_MS = 10000; // durée d'affichage dans le panneau (10s)
+// Liste des 10 derniers messages du canal (nouveaux + modifiés)
+let channelMessages = []; // { text, timestamp, edited }
+const MAX_CHANNEL_MESSAGES = 10;
 
 // ---------- URL publique de l'app (fournie par Render automatiquement) ----------
 function getPublicUrl() {
@@ -112,18 +112,42 @@ function startBot() {
 
   bot.on('polling_error', (err) => console.error('polling_error:', err.message));
 
-  // Message posté dans le canal -> on le récupère, on l'affiche dans le panneau, puis on le supprime du canal
+  // Message posté dans le canal -> on le récupère, on l'ajoute à la liste, puis on le supprime du canal
   bot.on('channel_post', async (msg) => {
     try {
       const isTargetChannel = config.CHANNEL_ID && String(msg.chat.id) === String(config.CHANNEL_ID);
       if (!isTargetChannel) return;
 
       const text = msg.text || msg.caption || '[message sans texte]';
-      lastChannelMessage = { text, timestamp: Date.now() };
+      channelMessages.unshift({ text, timestamp: Date.now(), edited: false });
+      if (channelMessages.length > MAX_CHANNEL_MESSAGES) {
+        channelMessages = channelMessages.slice(0, MAX_CHANNEL_MESSAGES);
+      }
 
       await bot.deleteMessage(msg.chat.id, msg.message_id);
     } catch (err) {
       console.error('Erreur channel_post:', err.message);
+    }
+  });
+
+  // Message modifié dans le canal -> on capture la version modifiée, on l'ajoute à la liste, on tente de supprimer
+  bot.on('edited_channel_post', async (msg) => {
+    try {
+      const isTargetChannel = config.CHANNEL_ID && String(msg.chat.id) === String(config.CHANNEL_ID);
+      if (!isTargetChannel) return;
+
+      const text = msg.text || msg.caption || '[message sans texte]';
+      channelMessages.unshift({ text, timestamp: Date.now(), edited: true });
+      if (channelMessages.length > MAX_CHANNEL_MESSAGES) {
+        channelMessages = channelMessages.slice(0, MAX_CHANNEL_MESSAGES);
+      }
+
+      // Tentative de suppression au cas où le message original n'aurait pas encore été supprimé
+      try {
+        await bot.deleteMessage(msg.chat.id, msg.message_id);
+      } catch (e) { /* ignore */ }
+    } catch (err) {
+      console.error('Erreur edited_channel_post:', err.message);
     }
   });
 }
@@ -169,6 +193,15 @@ app.use(express.static(__dirname));
 app.get('/api/config-status', (req, res) => {
   res.json({
     configured: !!(config.BOT_TOKEN && config.ADMIN_ID && config.CHANNEL_ID)
+  });
+});
+
+// Renvoie les infos de config non sensibles (sans le token)
+app.get('/api/config-info', (req, res) => {
+  res.json({
+    adminId: config.ADMIN_ID || '',
+    channelId: config.CHANNEL_ID || '',
+    hasToken: !!config.BOT_TOKEN
   });
 });
 
@@ -242,10 +275,8 @@ app.get('/api/current', (req, res) => {
     };
   }
 
-  // Un message de canal récent prend le pas sur l'affichage habituel du panneau
-  if (lastChannelMessage && (Date.now() - lastChannelMessage.timestamp) < CHANNEL_MESSAGE_DISPLAY_MS) {
-    payload.channelMessage = lastChannelMessage.text;
-  }
+  // Renvoie toujours la liste des 10 derniers messages (nouveaux + modifiés)
+  payload.channelMessages = channelMessages;
 
   res.json(payload);
 });

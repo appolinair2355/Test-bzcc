@@ -26,6 +26,7 @@
     padding: 18px 10px;
     text-align: center;
     box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+    flex-shrink: 0;
   }
   #header .brand {
     font-size: 15px;
@@ -55,6 +56,7 @@
     gap: 18px;
     padding: 20px;
     text-align: center;
+    overflow: hidden;
   }
   .idle-suits {
     display: flex;
@@ -99,18 +101,48 @@
   #card .number { font-size: 64px; font-weight: 800; }
   #card .suitName { font-size: 16px; opacity: 0.85; }
 
-  #channelMsg {
+  #channelList {
     display: none;
-    max-width: 300px;
-    font-size: 18px;
-    font-weight: 600;
-    line-height: 1.4;
-    background: rgba(255,255,255,0.12);
-    border: 1px solid rgba(255,255,255,0.3);
-    border-radius: 12px;
-    padding: 18px 20px;
-    animation: pop 0.25s ease;
+    max-width: 360px;
+    width: 100%;
+    max-height: 320px;
+    overflow-y: auto;
+    text-align: left;
   }
+  #channelList::-webkit-scrollbar { width: 6px; }
+  #channelList::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
+  .channel-msg {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    font-size: 14px;
+    line-height: 1.45;
+    word-break: break-word;
+  }
+  .channel-msg:first-child {
+    border-left: 3px solid #ff3b30;
+    background: rgba(255,255,255,0.14);
+  }
+  .channel-msg .meta {
+    font-size: 11px;
+    opacity: 0.65;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .channel-msg .meta .badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.15);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .channel-msg .meta .badge.new { background: rgba(124,252,0,0.2); color: #7CFC00; }
+  .channel-msg .meta .badge.edit { background: rgba(255,165,0,0.2); color: #FFA500; }
 
   #waiting {
     font-size: 15px;
@@ -126,6 +158,7 @@
     letter-spacing: 3px;
     background: #0d47a1;
     box-shadow: 0 -3px 10px rgba(0,0,0,0.25);
+    flex-shrink: 0;
   }
 </style>
 </head>
@@ -160,8 +193,8 @@
       <div class="suitName" id="cardSuitName">Pique</div>
     </div>
 
-    <!-- Message du canal (remplace temporairement la carte) -->
-    <div id="channelMsg"></div>
+    <!-- Liste des 10 derniers messages du canal -->
+    <div id="channelList"></div>
   </div>
 
   <div id="footer">BAR BOT</div>
@@ -182,7 +215,7 @@
   const cardGlyph = document.getElementById('cardGlyph');
   const cardNumber = document.getElementById('cardNumber');
   const cardSuitName = document.getElementById('cardSuitName');
-  const channelMsgEl = document.getElementById('channelMsg');
+  const channelListEl = document.getElementById('channelList');
 
   // Horloge (heure de la Côte d'Ivoire — Abidjan)
   function tickClock() {
@@ -200,12 +233,18 @@
   tickClock();
   setInterval(tickClock, 1000);
 
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   function showLocked(text) {
     lockOverlay.style.display = 'flex';
     idleSuits.style.display = 'none';
     waiting.style.display = 'none';
     cardEl.style.display = 'none';
-    channelMsgEl.style.display = 'none';
+    channelListEl.style.display = 'none';
     if (text) lockText.textContent = text;
   }
 
@@ -214,7 +253,7 @@
     idleSuits.style.display = 'flex';
     waiting.style.display = 'none';
     cardEl.style.display = 'none';
-    channelMsgEl.style.display = 'none';
+    channelListEl.style.display = 'none';
   }
 
   function showWaitingOnly() {
@@ -222,30 +261,51 @@
     idleSuits.style.display = 'none';
     waiting.style.display = 'block';
     cardEl.style.display = 'none';
-    channelMsgEl.style.display = 'none';
+    channelListEl.style.display = 'none';
   }
 
   function showCard(data) {
     lockOverlay.style.display = 'none';
     idleSuits.style.display = 'none';
     waiting.style.display = 'none';
-    channelMsgEl.style.display = 'none';
+    channelListEl.style.display = 'none';
     cardGlyph.textContent = data.suit;
     cardNumber.textContent = data.number;
     cardSuitName.textContent = data.suitName;
     cardEl.style.display = 'flex';
   }
 
-  function showChannelMessage(text) {
+  function showChannelMessages(messages) {
     lockOverlay.style.display = 'none';
     idleSuits.style.display = 'none';
     waiting.style.display = 'none';
     cardEl.style.display = 'none';
-    channelMsgEl.textContent = text;
-    channelMsgEl.style.display = 'block';
+    channelListEl.style.display = 'block';
+
+    if (!messages || messages.length === 0) {
+      channelListEl.innerHTML = '<div style="text-align:center; opacity:0.6; font-size:14px; padding:20px;">Aucun message du canal</div>';
+      return;
+    }
+
+    channelListEl.innerHTML = messages.map((m, i) => {
+      const time = new Date(m.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const badgeClass = m.edited ? 'edit' : 'new';
+      const badgeText = m.edited ? '✏️ Modifié' : '📨 Nouveau';
+      const highlight = i === 0 ? 'style="border-left:3px solid #ff3b30; background:rgba(255,255,255,0.14);"' : '';
+      return `
+        <div class="channel-msg" ${highlight}>
+          <div class="meta">
+            <span class="badge ${badgeClass}">${badgeText}</span>
+            <span>${time}</span>
+          </div>
+          <div>${escapeHtml(m.text)}</div>
+        </div>
+      `;
+    }).join('');
   }
 
   let isApproved = false;
+  let lastMessageCount = 0;
 
   async function loadGreeting() {
     if (!userId) return;
@@ -296,13 +356,26 @@
     try {
       const res = await fetch('/api/current');
       const data = await res.json();
-      if (data.channelMessage) {
-        showChannelMessage(data.channelMessage);
-      } else if (data.active) {
+
+      // Priorité 1 : carte active (tirage en cours)
+      if (data.active) {
         showCard(data);
-      } else {
-        showWaitingOnly();
+        return;
       }
+
+      // Priorité 2 : messages du canal
+      const msgs = data.channelMessages || [];
+      if (msgs.length > 0) {
+        // On ne re-render la liste que si le nombre de messages a changé
+        if (msgs.length !== lastMessageCount) {
+          lastMessageCount = msgs.length;
+          showChannelMessages(msgs);
+        }
+        return;
+      }
+
+      // Priorité 3 : écran d'attente
+      showWaitingOnly();
     } catch (e) { /* silencieux */ }
   }
 
