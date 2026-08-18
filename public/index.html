@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bot Baccara 1xbet — jeux live et réglages</title>
+<meta name="description" content="Tableau de bord du bot Baccara 1xbet : jeux live avec cartes et costumes, compteur B, rattrapages, formats de prédiction.">
+<style>
+:root{--bg:#080c12;--card:#121a24;--line:#1f2a36;--txt:#e8eef5;--mut:#8fa3b8;--ok:#28c76f;--ko:#ea5455;--go:#ffb400;--acc:#3ba3ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.55 system-ui,-apple-system,Segoe UI,sans-serif;padding:18px}
+h1{font-size:20px;margin:0}h3{margin:0 0 10px;font-size:15px}
+.mut{color:var(--mut);font-size:13px;white-space:pre-line}
+.wrap{max-width:1100px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:14px}
+.k{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+.v{font-size:24px;font-weight:700;margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--mut);font-size:11px;text-transform:uppercase}
+.ok{color:var(--ok)}.ko{color:var(--ko)}.go{color:var(--go)}.acc{color:var(--acc)}
+.live{background:#16324a}
+.cards span{display:inline-block;background:#0d1620;border:1px solid var(--line);border-radius:7px;padding:2px 7px;margin-right:4px;font-weight:600}
+input,button,select{font:inherit;border-radius:9px;border:1px solid var(--line);padding:9px 11px}
+input,select{background:#0d1620;color:var(--txt);width:100%}
+button{background:var(--acc);color:#04121f;border:0;font-weight:700;cursor:pointer}
+button.sec{background:#1e2c3a;color:var(--txt)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.row>*{flex:1 1 160px}.row>button{flex:0 0 auto}
+.scroll{overflow-x:auto}
+code{background:#0d1620;padding:2px 6px;border-radius:6px;font-size:12px;word-break:break-all;white-space:normal}
+.msg{margin-top:8px;font-size:13px}
+pre{background:#0d1620;border:1px solid var(--line);border-radius:9px;padding:10px;font-size:12px;overflow:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎴 Bot Baccara 1xbet</h1>
+  <div class="mut" id="live">chargement…</div>
+
+  <div class="grid">
+    <div class="card"><div class="k">Compteur B</div><div class="v" id="b">—</div></div>
+    <div class="card"><div class="k">Rattrapages</div><div class="v" id="maxr">—</div></div>
+    <div class="card"><div class="k">Main vérifiée</div><div class="v" id="hand">—</div></div>
+    <div class="card"><div class="k">Format</div><div class="v" id="fmt">—</div></div>
+    <div class="card"><div class="k">Réussite</div><div class="v ok" id="rate">—</div></div>
+  </div>
+
+  <div class="card">
+    <h3>⚙️ Réglages (aucun mot de passe)</h3>
+    <div class="row">
+      <input id="inB" type="number" min="1" placeholder="Compteur B (ex. 3)">
+      <button onclick="post('/api/setb',{b:val('inB')})">Définir B</button>
+      <input id="inR" type="number" min="0" max="9" placeholder="Rattrapages (ex. 2)">
+      <button onclick="post('/api/setmaxr',{maxR:val('inR')})">Définir rattrapages</button>
+    </div>
+    <div class="row">
+      <select id="inFmt"></select>
+      <button onclick="post('/api/setformat',{format:val('inFmt')})">Définir le format</button>
+      <select id="inHand"><option value="joueur">joueur</option><option value="banquier">banquier</option></select>
+      <button onclick="post('/api/sethand',{hand:val('inHand')})">Définir la main</button>
+    </div>
+    <div class="mut" id="fmtList"></div>
+    <div class="msg" id="msg1"></div>
+  </div>
+
+  <div class="card">
+    <h3>🤖 Bot Telegram</h3>
+    <div class="row">
+      <input id="inTok" placeholder="Token du bot (123456:ABC…)">
+      <button onclick="post('/api/bot/token',{token:val('inTok')})">Enregistrer</button>
+      <button class="sec" onclick="post('/api/bot/restart',{})">Redémarrer</button>
+    </div>
+    <div class="row">
+      <input id="inAdmin" type="number" placeholder="ID administrateur Telegram">
+      <button onclick="post('/api/bot/admin',{adminId:val('inAdmin')})">Définir l'admin</button>
+    </div>
+    <div class="mut" id="botInfo"></div>
+    <div class="row">
+      <input id="inCh" placeholder="ID de canal (-100…)">
+      <button onclick="post('/api/channels/activate',{id:val('inCh')})">Activer</button>
+      <button class="sec" onclick="post('/api/channels/deactivate',{id:val('inCh')})">Désactiver</button>
+    </div>
+    <div class="mut" id="chans"></div>
+  </div>
+
+  <div class="card">
+    <h3>🎯 Prédictions</h3>
+    <div class="scroll"><table><thead><tr><th>Tour</th><th>Costume</th><th>Main</th><th>R</th><th>Statut</th><th>Message</th></tr></thead><tbody id="preds"></tbody></table></div>
+  </div>
+
+  <div class="card">
+    <h3>🧩 Stratégie « absent apparue »</h3>
+    <div class="mut" id="absentInfo">chargement…</div>
+    <div class="row">
+      <input id="inAbsCh" placeholder="ID du canal relais Telegram (-100…)">
+      <button onclick="postAbs('/api/absent/channel',{id:val('inAbsCh')})">Définir le canal relais</button>
+    </div>
+    <div class="row">
+      <button class="sec" onclick="postAbs('/api/absent/toggle',{enabled:true})">Activer</button>
+      <button class="sec" onclick="postAbs('/api/absent/toggle',{enabled:false})">Désactiver</button>
+    </div>
+    <div class="msg" id="msg2"></div>
+    <div class="scroll" style="margin-top:10px"><table><thead><tr><th>Apparu #N</th><th>Cible #N</th><th>Costume</th><th>R</th><th>Statut</th><th>Relayé</th><th>Message</th></tr></thead><tbody id="absentPreds"></tbody></table></div>
+  </div>
+
+  <div class="card">
+    <h3>🃏 Jeux récents</h3>
+    <div class="scroll"><table><thead><tr><th>#N</th><th>Joueur</th><th>Val</th><th>Banquier</th><th>Val</th><th>Gagnant</th><th>État</th></tr></thead><tbody id="games"></tbody></table></div>
+  </div>
+</div>
+
+<script>
+const val = (id) => document.getElementById(id).value.trim();
+const el = (id) => document.getElementById(id);
+
+async function post(url, body) {
+  try {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    el('msg1').innerHTML = r.ok ? '<span class="ok">✅ Enregistré</span>' : '<span class="ko">❌ ' + (j.error || 'erreur') + '</span>';
+  } catch (e) { el('msg1').innerHTML = '<span class="ko">❌ ' + e.message + '</span>'; }
+  load();
+}
+
+async function postAbs(url, body) {
+  try {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    el('msg2').innerHTML = r.ok ? '<span class="ok">✅ Enregistré</span>' : '<span class="ko">❌ ' + (j.error || 'erreur') + '</span>';
+  } catch (e) { el('msg2').innerHTML = '<span class="ko">❌ ' + e.message + '</span>'; }
+  load();
+}
+
+async function loadAbsent() {
+  try {
+    const a = await (await fetch('/api/absent')).json();
+    el('absentInfo').textContent =
+      `État : ${a.enabled ? 'activée' : 'désactivée'} • seuil ${a.absenceTarget} (fixe) • retour +${a.resumeLead} (fixe) • rattrapages ${a.maxR} (fixe)\n` +
+      `Canal relais : ${a.channelId || '—'}\n` +
+      `Suivi : ` + a.suits.map(s => s + (a.watching[s] ? '👀' : a.absence[s])).join('  ') +
+      `\nSite : ${a.stats.total} • ✅${a.stats.win} ❌${a.stats.loss} (${a.stats.rate}%) — Relayées Telegram : ${a.stats.forwardedTotal} • ✅${a.stats.forwardedWin} ❌${a.stats.forwardedLoss} (${a.stats.forwardedRate}%)`;
+    el('absentPreds').innerHTML = a.predictions.map(p =>
+      `<tr><td>#N${p.appearGame}</td><td>#N${p.target}</td><td>${p.suit}</td><td>${p.step}/${p.maxR}</td>` +
+      `<td class="${p.status === 'gagné' ? 'ok' : p.status === 'perdu' ? 'ko' : 'go'}">${p.badge || p.status}</td>` +
+      `<td>${p.forward ? '📡 oui' : '—'}</td><td>${p.text.replace(/\n/g, ' · ')}</td></tr>`
+    ).join('');
+  } catch (e) { el('absentInfo').textContent = '⚠️ ' + e.message; }
+}
+
+async function load() {
+  try {
+    const s = await (await fetch('/api/state')).json();
+    el('b').textContent = s.b; el('maxr').textContent = s.maxR;
+    el('hand').textContent = s.hand; el('fmt').textContent = s.format;
+    el('rate').textContent = s.stats.rate + '%';
+    const g = s.live;
+    el('live').textContent = g
+      ? `Tour #N${g.number} • costumes joueur ${(g.playerSuits||[]).join(' ')||'—'} • costumes banquier ${(g.bankerSuits||[]).join(' ')||'—'} • ${g.finished ? 'terminé' : g.dealing ? 'distribution' : 'attente'}`
+        + `\ncompteurs B : ` + s.suits.map(x => x + s.counters[x]).join('  ')
+      : (s.error ? '⚠️ ' + s.error : 'aucun jeu live');
+    if (!el('inFmt').options.length) {
+      el('inFmt').innerHTML = s.formats.split('\n').map(l => `<option value="${l.split('—')[0].trim()}">${l.trim()}</option>`).join('');
+      el('fmtList').textContent = s.formats;
+    }
+    el('inFmt').value = s.format; el('inHand').value = s.hand;
+    el('botInfo').textContent = `${s.bot.running ? '🟢 en ligne' : '🔴 arrêté'} ${s.bot.username ? '@' + s.bot.username : ''} • token ${s.bot.tokenMasked || '—'} • admin ${s.bot.adminId}` + (s.bot.error ? ' • ⚠️ ' + s.bot.error : '');
+    el('chans').innerHTML = s.channels.length
+      ? s.channels.map(c => `${c.active ? '✅' : '⚪'} ${c.title} — <code>${c.id}</code>`).join('<br>')
+      : 'aucun canal détecté';
+    el('preds').innerHTML = s.predictions.map(p => `<tr><td>#N${p.target}</td><td>${p.suit}</td><td>${p.hand}</td><td>${p.step}/${p.maxR}</td><td class="${p.status === 'gagné' ? 'ok' : p.status === 'perdu' ? 'ko' : 'go'}">${p.badge || p.status}</td><td>${p.text.replace(/\n/g, ' · ')}</td></tr>`).join('');
+    const gs = await (await fetch('/api/games?limit=30')).json();
+    el('games').innerHTML = gs.games.map(x => `<tr class="${g && x.number === g.number ? 'live' : ''}"><td>#N${x.number}</td><td class="cards">${(x.player||[]).map(c => '<span>' + c + '</span>').join('')}</td><td>${x.playerValue ?? '—'}</td><td class="cards">${(x.banker||[]).map(c => '<span>' + c + '</span>').join('')}</td><td>${x.bankerValue ?? '—'}</td><td>${x.winner || '—'}</td><td>${x.finished ? 'terminé' : x.dealing ? 'distribution' : 'attente'}</td></tr>`).join('');
+  } catch (e) { el('live').textContent = '⚠️ ' + e.message; }
+  loadAbsent();
+}
+load(); setInterval(load, 2500);
+</script>
+</body>
+</html>
